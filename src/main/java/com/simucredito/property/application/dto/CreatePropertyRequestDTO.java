@@ -39,8 +39,6 @@ public class CreatePropertyRequestDTO {
     @NotNull(message = "Property price is required")
     private BigDecimal propertyPrice;
 
-    private BigDecimal garageValue;
-
     private Boolean isSustainable;
 
     private String[] photos;

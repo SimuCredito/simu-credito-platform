@@ -57,9 +57,6 @@ public class Property {
     @Column(name = "precio_vivienda", nullable = false, precision = 12, scale = 2)
     private BigDecimal propertyPrice;
 
-    @Column(name = "valor_cochera", precision = 12, scale = 2)
-    private BigDecimal garageValue;
-
     @Column(name = "es_sostenible")
     @Builder.Default
     private Boolean isSustainable = false;

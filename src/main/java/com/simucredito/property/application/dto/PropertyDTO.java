@@ -27,7 +27,6 @@ public class PropertyDTO {
     private Integer bathrooms;
     private Integer garages;
     private BigDecimal propertyPrice;
-    private BigDecimal garageValue;
     private Boolean isSustainable;
     private String[] photos;
     private LocalDateTime registrationDate;

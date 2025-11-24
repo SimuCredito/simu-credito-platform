@@ -52,7 +52,6 @@ public class PropertyService {
                 .bathrooms(request.getBathrooms())
                 .garages(request.getGarages())
                 .propertyPrice(request.getPropertyPrice())
-                .garageValue(request.getGarageValue())
                 .isSustainable(request.getIsSustainable())
                 .photos(photosString)
                 .build();
@@ -134,7 +133,6 @@ public class PropertyService {
         property.setBathrooms(request.getBathrooms());
         property.setGarages(request.getGarages());
         property.setPropertyPrice(request.getPropertyPrice());
-        property.setGarageValue(request.getGarageValue());
         property.setIsSustainable(request.getIsSustainable());
 
         // Convert photos array to comma-separated string for storage
