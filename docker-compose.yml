@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: simucredito-db
+    environment:
+      - POSTGRES_DB=simucredito_db
+      - POSTGRES_USER=simucredito_user
+      - POSTGRES_PASSWORD=simucredito_pass
+    ports:
+      # CAMBIO IMPORTANTE: Usamos 5433 en el host para evitar el error "port allocated"
+      # Formato: "PUERTO_EXTERNO:PUERTO_INTERNO"
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  postgres_data:
