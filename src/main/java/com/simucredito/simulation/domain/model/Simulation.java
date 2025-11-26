@@ -59,7 +59,7 @@ public class Simulation {
     @Column(name = "term_years", nullable = false)
     private Integer termYears;
 
-    @Column(name = "interest_rate", nullable = false)
+    @Column(name = "interest_rate", precision = 12, scale = 9)
     private BigDecimal interestRate;
 
     @Column(name = "interest_rate_type", nullable = false)
@@ -71,7 +71,7 @@ public class Simulation {
     @Column(name = "interest_rate_capitalization")
     private String interestRateCapitalization; // Only for TN
 
-    @Column(name = "opportunity_cost_rate", nullable = false)
+    @Column(name = "opportunity_cost_rate", precision = 12, scale = 9)
     private BigDecimal opportunityCostRate;
 
     @Column(name = "opportunity_cost_type", nullable = false)
@@ -101,13 +101,13 @@ public class Simulation {
     @Column(name = "desgravamen_enabled", nullable = false)
     private Boolean desgravamenEnabled;
 
-    @Column(name = "desgravamen_rate", nullable = false)
+    @Column(name = "desgravamen_rate", precision = 12, scale = 9)
     private BigDecimal desgravamenRate;
 
     @Column(name = "property_insurance_enabled", nullable = false)
     private Boolean propertyInsuranceEnabled;
 
-    @Column(name = "property_insurance_rate", nullable = false)
+    @Column(name = "property_insurance_rate", precision = 12, scale = 9)
     private BigDecimal propertyInsuranceRate;
 
     @Column(name = "property_insurance_value", nullable = false)
@@ -131,6 +131,21 @@ public class Simulation {
 
     @Column(name = "total_interest", nullable = false)
     private BigDecimal totalInterest;
+
+    @Column(name = "total_capital_amortization", precision = 19, scale = 2)
+    private BigDecimal totalCapitalAmortization;
+
+    @Column(name = "total_desgravamen", precision = 19, scale = 2)
+    private BigDecimal totalDesgravamen;
+
+    @Column(name = "total_risk_insurance", precision = 19, scale = 2)
+    private BigDecimal totalRiskInsurance;
+
+    @Column(name = "total_commissions", precision = 19, scale = 2)
+    private BigDecimal totalCommissions;
+
+    @Column(name = "total_admin_expenses", precision = 19, scale = 2)
+    private BigDecimal totalAdminExpenses;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

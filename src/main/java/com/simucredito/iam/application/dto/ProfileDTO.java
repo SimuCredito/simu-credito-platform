@@ -15,8 +15,8 @@ public class ProfileDTO {
 
     private Long id;
     private String email;
-    private String nombres; // firstName
-    private String apellidos; // lastName
+    private String firstName;
+    private String lastName;
     private String phoneNumber;
     private String companyName;
     private String role;

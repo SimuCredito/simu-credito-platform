@@ -20,6 +20,7 @@ public class SimulationResponseDTO {
     private PropertyInfo propertyInfo;
     private Summary summary;
     private KeyIndicators keyIndicators;
+    private TotalResults totalResults;
     private AmortizationSchedule amortizationSchedule;
     private String calculationMethod;
     private LocalDateTime generatedAt;
@@ -66,7 +67,19 @@ public class SimulationResponseDTO {
         private BigDecimal cok;
         private BigDecimal van;
         private BigDecimal tir;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TotalResults {
         private BigDecimal totalInterest;
+        private BigDecimal totalCapitalAmortization;
+        private BigDecimal totalDesgravamen;
+        private BigDecimal totalRiskInsurance;
+        private BigDecimal totalCommissions;
+        private BigDecimal totalAdminExpenses;
     }
 
     @Data

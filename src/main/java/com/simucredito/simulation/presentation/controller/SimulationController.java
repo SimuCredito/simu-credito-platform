@@ -60,15 +60,25 @@ public class SimulationController {
 
         var financialEntity = financialEntityOpt.get();
 
+        BigDecimal financingAmountInPen = request.getCalculatedValues().getFinancingAmount();
+
+        if ("USD".equals(request.getFinancingDetails().getCurrency())) {
+            BigDecimal exchangeRate = request.getFinancingDetails().getUsdValue();
+            if (exchangeRate == null || exchangeRate.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException("Exchange rate (usdValue) is required for USD simulations");
+            }
+            financingAmountInPen = financingAmountInPen.multiply(exchangeRate);
+        }
+
         // Check financing amount against entity limits
         if (financialEntity.getMaxLoanAmount() != null &&
-            request.getCalculatedValues().getFinancingAmount().compareTo(financialEntity.getMaxLoanAmount()) > 0) {
-            throw new IllegalArgumentException("Financing amount exceeds entity maximum limit");
+                financingAmountInPen.compareTo(financialEntity.getMaxLoanAmount()) > 0) {
+            throw new IllegalArgumentException("Financing amount (converted to PEN) exceeds entity maximum limit");
         }
 
         if (financialEntity.getMinLoanAmount() != null &&
-            request.getCalculatedValues().getFinancingAmount().compareTo(financialEntity.getMinLoanAmount()) < 0) {
-            throw new IllegalArgumentException("Financing amount is below entity minimum limit");
+                financingAmountInPen.compareTo(financialEntity.getMinLoanAmount()) < 0) {
+            throw new IllegalArgumentException("Financing amount (converted to PEN) is below entity minimum limit");
         }
 
         // Validate term against entity limits

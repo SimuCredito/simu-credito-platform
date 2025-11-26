@@ -5,6 +5,7 @@ import com.simucredito.configuration.application.dto.FinancialEntityDTO;
 import com.simucredito.configuration.application.dto.GlobalValueDTO;
 import com.simucredito.configuration.application.dto.UploadFinancialEntityPhotosResponseDTO;
 import com.simucredito.configuration.application.service.ConfigurationService;
+import com.simucredito.configuration.infrastructure.service.ExchangeRateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,6 +32,7 @@ import java.util.List;
 public class ConfigurationController {
 
     private final ConfigurationService configurationService;
+    private final ExchangeRateService exchangeRateService;
 
     // Financial Entity endpoints
     @GetMapping("/financial-entities")
@@ -291,6 +293,18 @@ public class ConfigurationController {
         return configurationService.updateGlobalValue(id, dto)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+
+    @GetMapping("/exchange-rate/current")
+    @Operation(summary = "Get current exchange rate (SUNAT)", description = "Retrieve current USD/PEN exchange rate from external API")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Exchange rate retrieved successfully"),
+            @ApiResponse(responseCode = "500", description = "Error fetching external API")
+    })
+    public ResponseEntity<ExchangeRateService.ExchangeRateDTO> getCurrentExchangeRate() {
+        ExchangeRateService.ExchangeRateDTO rate = exchangeRateService.getCurrentExchangeRate();
+        return ResponseEntity.ok(rate);
     }
 
     /*

@@ -47,30 +47,37 @@ public class SimulationService {
 
     @Transactional
     public SimulationResponseDTO createSimulation(CreateSimulationRequestDTO request) {
-        // Get current user
+        // ... (Lógica de validación de usuario, cliente, propiedad... igual que antes) ...
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String email = authentication.getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // Validate client exists
         var client = clientService.getClientById(request.getClientId());
-
-        // Validate property exists
         var property = propertyService.getPropertyById(request.getPropertyId());
 
-        // Validate financial entity exists if provided
         if (request.getFinancialEntityId() != null) {
             configurationService.getFinancialEntityById(request.getFinancialEntityId());
         }
 
-        // Convert rates to TEM
+        // 1. Conversión de Tasas (Igual que antes)
         BigDecimal interestRateTEM = financialCalculator.convertToTEM(
                 request.getFinancingDetails().getInterestRate().getRate(),
                 request.getFinancingDetails().getInterestRate().getType(),
                 request.getFinancingDetails().getInterestRate().getPeriod(),
                 request.getFinancingDetails().getInterestRate().getCapitalization()
         );
+
+        /*
+        BigDecimal rateForAnnuity = interestRateTEM;
+        if (Boolean.TRUE.equals(request.getFinancingDetails().getInsurance().getDesgravamen().getEnabled())) {
+            rateForAnnuity = rateForAnnuity.add(
+                    request.getFinancingDetails().getInsurance().getDesgravamen().getRate()
+            );
+        }
+
+         */
+
 
         BigDecimal opportunityCostTEM = financialCalculator.calculateCOK(
                 request.getFinancingDetails().getOpportunityCost().getRate(),
@@ -79,87 +86,26 @@ public class SimulationService {
                 request.getFinancingDetails().getOpportunityCost().getCapitalization()
         );
 
-        // Calcular COK Anual (TEA) para el reporte,
-        // Fórmula: TEA = (1 + TEM)^12 - 1
-        BigDecimal opportunityCostTEA = opportunityCostTEM.add(BigDecimal.ONE)
-                .pow(12, MATH_CONTEXT)
-                .subtract(BigDecimal.ONE)
-                .multiply(BigDecimal.valueOf(100));
+        BigDecimal opportunityCostTEMPercentage = opportunityCostTEM.multiply(BigDecimal.valueOf(100), MATH_CONTEXT)
+                .setScale(4, RoundingMode.HALF_UP);
 
-        // Calculate monthly payment (principal + interest only, costs added separately)
-        BigDecimal monthlyPayment = financialCalculator.calculateMonthlyPayment(
+        BigDecimal monthlyPaymentRef = financialCalculator.calculateMonthlyPayment(
+                request.getCalculatedValues().getFinancingAmount(),
+                interestRateTEM, // Usamos la tasa combinada aquí
+                request.getFinancingDetails().getTermYears() * 12
+        );
+
+        /*
+        // 2. Calculo Inicial Referencial (Igual que antes)
+        BigDecimal monthlyPaymentRef = financialCalculator.calculateMonthlyPayment(
                 request.getCalculatedValues().getFinancingAmount(),
                 interestRateTEM,
                 request.getFinancingDetails().getTermYears() * 12
         );
 
-        // Calculate total payments (principal + interest)
-        BigDecimal totalPayments = monthlyPayment.multiply(BigDecimal.valueOf(request.getFinancingDetails().getTermYears() * 12));
+         */
 
-        // Calculate total interest
-        BigDecimal totalInterest = totalPayments.subtract(request.getCalculatedValues().getFinancingAmount());
-
-        // Calculate VAN using opportunity cost
-        BigDecimal van = financialCalculator.calculateVAN(
-                monthlyPayment.add(calculateMonthlyCosts(request)),
-                opportunityCostTEM,
-                request.getFinancingDetails().getTermYears() * 12,
-                request.getCalculatedValues().getFinancingAmount().negate() // Initial investment is negative
-        );
-
-        // Calculate TIR
-        BigDecimal tir = financialCalculator.calculateTIR(
-                monthlyPayment.add(calculateMonthlyCosts(request)),
-                request.getCalculatedValues().getFinancingAmount(),
-                request.getFinancingDetails().getTermYears() * 12,
-                100, // max iterations
-                0.0001 // tolerance
-        );
-
-        // La variable 'tir' calculada arriba es la TIR *mensual* en formato porcentaje (ej: 1.5)
-        // La TCEA es esa TIR mensual, anualizada.
-        // Fórmula: TCEA = (1 + TIR_mensual_decimal)^12 - 1
-
-        // 1. Convertir TIR mensual (que está en porcentaje) a decimal
-        BigDecimal tirMonthlyDecimal = tir.divide(BigDecimal.valueOf(100), MATH_CONTEXT);
-
-        // 2. Calcular TCEA: (1 + TIR_mensual)^12 - 1
-        BigDecimal tcea = tirMonthlyDecimal.add(BigDecimal.ONE)
-                .pow(12, MATH_CONTEXT)
-                .subtract(BigDecimal.ONE)
-                .multiply(BigDecimal.valueOf(100)); // Convertir TCEA final a porcentaje
-
-        // 1. Obtener costos fijos mensuales
-        BigDecimal fixedMonthlyCosts = request.getFinancingDetails().getMonthlyCosts().getConstantCommissions()
-                .add(request.getFinancingDetails().getMonthlyCosts().getAdministrationCosts());
-        if ("physical".equals(request.getFinancingDetails().getStatementDelivery())) {
-            fixedMonthlyCosts = fixedMonthlyCosts.add(BigDecimal.valueOf(10));
-        }
-
-        // 2. Calcular seguros del MES 1 (basados en el saldo inicial total)
-        BigDecimal financingAmount = request.getCalculatedValues().getFinancingAmount();
-        BigDecimal lifeInsurancePmt = BigDecimal.ZERO;
-        if (Boolean.TRUE.equals(request.getFinancingDetails().getInsurance().getDesgravamen().getEnabled())) {
-            lifeInsurancePmt = financingAmount.multiply(
-                    request.getFinancingDetails().getInsurance().getDesgravamen().getRate(), MATH_CONTEXT);
-        }
-
-        BigDecimal propertyInsurancePmt = BigDecimal.ZERO;
-        if (Boolean.TRUE.equals(request.getFinancingDetails().getInsurance().getPropertyInsurance().getEnabled())) {
-            BigDecimal annualRate = request.getFinancingDetails().getInsurance().getPropertyInsurance().getRate();
-            BigDecimal monthlyRate = annualRate.divide(BigDecimal.valueOf(12), MATH_CONTEXT); // Dividir tasa anual
-            propertyInsurancePmt = request.getFinancingDetails().getInsurance().getPropertyInsurance().getValue()
-                    .multiply(monthlyRate, MATH_CONTEXT);
-        }
-
-        // 3. Sumar todo: Cuota (C+I) + Costos Fijos + Seguros Mes 1
-        BigDecimal firstTotalPayment = monthlyPayment
-                .add(fixedMonthlyCosts)
-                .add(lifeInsurancePmt)
-                .add(propertyInsurancePmt)
-                .setScale(2, RoundingMode.HALF_UP);
-
-        // Create simulation entity
+        // 3. Crear Entidad (Guardamos temporalmente valores referenciales)
         Simulation simulation = Simulation.builder()
                 .userId(user.getId())
                 .clientId(request.getClientId())
@@ -187,41 +133,135 @@ public class SimulationService {
                 .monthlyCommissions(request.getFinancingDetails().getMonthlyCosts().getConstantCommissions())
                 .administrationCosts(request.getFinancingDetails().getMonthlyCosts().getAdministrationCosts())
                 .statementDelivery(request.getFinancingDetails().getStatementDelivery())
-                .desgravamenEnabled(request.getFinancingDetails().getInsurance() != null &&
-                        request.getFinancingDetails().getInsurance().getDesgravamen() != null &&
-                        Boolean.TRUE.equals(request.getFinancingDetails().getInsurance().getDesgravamen().getEnabled()))
-                .desgravamenRate(request.getFinancingDetails().getInsurance() != null &&
-                        request.getFinancingDetails().getInsurance().getDesgravamen() != null &&
-                        Boolean.TRUE.equals(request.getFinancingDetails().getInsurance().getDesgravamen().getEnabled()) ?
+                .desgravamenEnabled(request.getFinancingDetails().getInsurance().getDesgravamen().getEnabled())
+                .desgravamenRate(request.getFinancingDetails().getInsurance().getDesgravamen().getEnabled() ?
                         request.getFinancingDetails().getInsurance().getDesgravamen().getRate() : BigDecimal.ZERO)
-                .propertyInsuranceEnabled(request.getFinancingDetails().getInsurance() != null &&
-                        request.getFinancingDetails().getInsurance().getPropertyInsurance() != null &&
-                        Boolean.TRUE.equals(request.getFinancingDetails().getInsurance().getPropertyInsurance().getEnabled()))
-                .propertyInsuranceRate(request.getFinancingDetails().getInsurance() != null &&
-                        request.getFinancingDetails().getInsurance().getPropertyInsurance() != null &&
-                        Boolean.TRUE.equals(request.getFinancingDetails().getInsurance().getPropertyInsurance().getEnabled()) ?
+                .propertyInsuranceEnabled(request.getFinancingDetails().getInsurance().getPropertyInsurance().getEnabled())
+                .propertyInsuranceRate(request.getFinancingDetails().getInsurance().getPropertyInsurance().getEnabled() ?
                         request.getFinancingDetails().getInsurance().getPropertyInsurance().getRate() : BigDecimal.ZERO)
-                .propertyInsuranceValue(request.getFinancingDetails().getInsurance() != null &&
-                        request.getFinancingDetails().getInsurance().getPropertyInsurance() != null ?
-                        request.getFinancingDetails().getInsurance().getPropertyInsurance().getValue() : BigDecimal.ZERO)
-                .monthlyPayment(firstTotalPayment)
-                .tcea(tcea)
-                .cok(opportunityCostTEA)
-                .van(van)
-                .tir(tir)
-                .totalInterest(totalInterest)
+                .propertyInsuranceValue(request.getFinancingDetails().getInsurance().getPropertyInsurance().getValue())
+                // Valores temporales, se actualizarán abajo
+                .monthlyPayment(BigDecimal.ZERO)
+                .tcea(BigDecimal.ZERO)
+                .cok(opportunityCostTEMPercentage)
+                .van(BigDecimal.ZERO)
+                .tir(BigDecimal.ZERO)
+                .totalInterest(BigDecimal.ZERO)
                 .status(Simulation.SimulationStatus.COMPLETED)
                 .build();
 
+        // 4. Generar Cronograma (Aquí ocurre la magia real)
+        List<FinancialCalculator.AmortizationEntry> entries = financialCalculator.generateAmortizationSchedule(
+                simulation.getFinancingAmount(),
+                interestRateTEM,
+                monthlyPaymentRef,
+                simulation.getTermYears() * 12,
+                simulation.getGracePeriodDurationMonths(),
+                simulation.getGracePeriodType(),
+                simulation.getDesgravamenEnabled() ? simulation.getDesgravamenRate() : BigDecimal.ZERO,
+                simulation.getPropertyInsuranceEnabled() ? simulation.getPropertyInsuranceRate() : BigDecimal.ZERO,
+                simulation.getMonthlyCommissions(),
+                simulation.getAdministrationCosts(),
+                simulation.getStatementDelivery(),
+                simulation.getPropertyInsuranceValue()
+        );
+
+        BigDecimal realTotalInterest = BigDecimal.ZERO;
+        BigDecimal sumPrincipal = BigDecimal.ZERO;
+        BigDecimal sumDesgravamen = BigDecimal.ZERO;
+        BigDecimal sumRisk = BigDecimal.ZERO;
+        BigDecimal sumCommissions = BigDecimal.ZERO;
+        BigDecimal sumAdmin = BigDecimal.ZERO;
+        // Lista de flujos para la TIR: [ -Prestamo, Cuota1, Cuota2, ..., CuotaN ]
+        List<BigDecimal> cashFlows = new java.util.ArrayList<>();
+        cashFlows.add(request.getCalculatedValues().getFinancingAmount()); // Periodo 0: Desembolso (Negativo)
+
+        BigDecimal representativeMonthlyPayment = BigDecimal.ZERO;
+
+        List<AmortizationSchedule> schedule = new java.util.ArrayList<>();
+        for (FinancialCalculator.AmortizationEntry entry : entries) {
+            realTotalInterest = realTotalInterest.add(entry.getInterestPayment());
+            sumPrincipal = sumPrincipal.add(entry.getPrincipalPayment());
+            sumDesgravamen = sumDesgravamen.add(entry.getLifeInsurancePayment());
+            sumRisk = sumRisk.add(entry.getPropertyInsurancePayment());
+            sumCommissions = sumCommissions.add(entry.getCommissions());
+            sumAdmin = sumAdmin.add(entry.getAdminCosts()).add(entry.getDeliveryCosts());
+
+            cashFlows.add(entry.getPayment().negate());
+
+            // Lógica para elegir qué cuota mostrar en el resumen ("Cuota Mensual Total")
+            // Si hay gracia, mostramos la primera cuota "NORMAL" (después de la gracia).
+            // Si no hay gracia (o estamos en ella), tomamos la del periodo actual si no se ha seteado.
+            int graceMonths = simulation.getGracePeriodDurationMonths() != null ? simulation.getGracePeriodDurationMonths() : 0;
+
+            if (entry.getPeriodNumber() == graceMonths + 1) {
+                representativeMonthlyPayment = entry.getPayment();
+            } else if (graceMonths == 0 && entry.getPeriodNumber() == 1) {
+                representativeMonthlyPayment = entry.getScheduledPayment();
+            }
+
+            // Fallback por si acaso
+            if (representativeMonthlyPayment.compareTo(BigDecimal.ZERO) == 0 && entry.getPeriodNumber() == 1) {
+                representativeMonthlyPayment = entry.getScheduledPayment();
+            }
+
+            schedule.add(AmortizationSchedule.builder()
+                    .simulation(simulation)
+                    .periodNumber(entry.getPeriodNumber())
+                    .paymentDate(LocalDate.now().plusMonths(entry.getPeriodNumber()))
+                    .tem(interestRateTEM)
+                    .gracePeriod(simulation.getGracePeriodDurationMonths() != null ? simulation.getGracePeriodDurationMonths() : 0)
+                    .initialBalance(entry.getBeginningBalance())
+                    .interest(entry.getInterestPayment())
+                    .payment(entry.getScheduledPayment())
+                    .principal(entry.getPrincipalPayment())
+                    .lifeInsurance(entry.getLifeInsurancePayment())
+                    .propertyInsurance(entry.getPropertyInsurancePayment())
+                    .commissions(entry.getCommissions())
+                    .adminCosts(entry.getAdminCosts())
+                    .deliveryCosts(entry.getDeliveryCosts())
+                    .finalBalance(entry.getEndingBalance())
+                    .cashFlow(entry.getCashFlow())
+                    .cumulativePrincipal(entry.getCumulativePrincipal())
+                    .cumulativeInterest(entry.getCumulativeInterest())
+                    .isGracePeriod(entry.isGracePeriod())
+                    .build());
+        }
+
+        // 6. Calcular VAN y TIR reales basados en el flujo de caja EXACTO
+
+        // TIR Mensual
+        BigDecimal tirMensual = financialCalculator.calculateScheduleTIR(cashFlows);
+
+        // TIR Anual (TCEA) = (1 + TIR_Mensual)^12 - 1
+        // Nota: tirMensual viene en porcentaje (ej: 0.85), hay que dividir por 100
+        BigDecimal tirDecimal = tirMensual.divide(BigDecimal.valueOf(100), MATH_CONTEXT);
+        BigDecimal tcea = tirDecimal.add(BigDecimal.ONE)
+                .pow(12, MATH_CONTEXT)
+                .subtract(BigDecimal.ONE)
+                .multiply(BigDecimal.valueOf(100));
+
+        // VAN
+        BigDecimal van = financialCalculator.calculateScheduleVAN(cashFlows, opportunityCostTEM);
+
+        // 7. Actualizar Entidad con Valores Reales
+        simulation.setMonthlyPayment(representativeMonthlyPayment.setScale(2, RoundingMode.HALF_UP));
+        simulation.setTcea(tcea.setScale(2, RoundingMode.HALF_UP));
+        simulation.setVan(van.setScale(2, RoundingMode.HALF_UP));
+        simulation.setTir(tirMensual.setScale(4, RoundingMode.HALF_UP)); // TIR Mensual
+
+        simulation.setTotalInterest(realTotalInterest.setScale(2, RoundingMode.HALF_UP));
+        simulation.setTotalCapitalAmortization(sumPrincipal.setScale(2, RoundingMode.HALF_UP));
+        simulation.setTotalDesgravamen(sumDesgravamen.setScale(2, RoundingMode.HALF_UP));
+        simulation.setTotalRiskInsurance(sumRisk.setScale(2, RoundingMode.HALF_UP));
+        simulation.setTotalCommissions(sumCommissions.setScale(2, RoundingMode.HALF_UP));
+        simulation.setTotalAdminExpenses(sumAdmin.setScale(2, RoundingMode.HALF_UP));
+
+        // Guardar todo
+        simulation.setAmortizationSchedule(schedule);
         simulation = simulationRepository.save(simulation);
 
-        // Generate amortization schedule
-        generateAmortizationSchedule(simulation, interestRateTEM, monthlyPayment);
-
-        log.info("Created simulation {} for user {} with financing amount {}",
-                simulation.getId(), user.getEmail(), request.getCalculatedValues().getFinancingAmount());
-
-        return mapToResponseDTO(simulation, client, property, false); // Without amortization schedule
+        return mapToResponseDTO(simulation, client, property, false);
     }
 
     private BigDecimal calculateMonthlyCosts(CreateSimulationRequestDTO request) {
@@ -439,7 +479,6 @@ public class SimulationService {
                 .cok(simulation.getCok())
                 .van(simulation.getVan())
                 .tir(simulation.getTir())
-                .totalInterest(simulation.getTotalInterest())
                 .build();
 
         SimulationResponseDTO.InputParameters inputs = SimulationResponseDTO.InputParameters.builder()
@@ -464,12 +503,22 @@ public class SimulationService {
                 .propertyInsuranceRate(simulation.getPropertyInsuranceRate())
                 .build();
 
+        SimulationResponseDTO.TotalResults totalResults = SimulationResponseDTO.TotalResults.builder()
+                .totalInterest(simulation.getTotalInterest())
+                .totalCapitalAmortization(simulation.getTotalCapitalAmortization())
+                .totalDesgravamen(simulation.getTotalDesgravamen())
+                .totalRiskInsurance(simulation.getTotalRiskInsurance())
+                .totalCommissions(simulation.getTotalCommissions())
+                .totalAdminExpenses(simulation.getTotalAdminExpenses())
+                .build();
+
         SimulationResponseDTO dto = SimulationResponseDTO.builder()
                 .simulationId(simulation.getId().toString())
                 .clientInfo(clientInfo)
                 .propertyInfo(propertyInfo)
                 .summary(summary)
                 .keyIndicators(keyIndicators)
+                .totalResults(totalResults)
                 .inputs(inputs)
                 .calculationMethod("French Method (Ordinary Annuity)")
                 .generatedAt(simulation.getCreatedAt())
