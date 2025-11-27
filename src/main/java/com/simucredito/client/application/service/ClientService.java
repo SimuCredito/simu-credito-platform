@@ -5,6 +5,7 @@ import com.simucredito.client.domain.model.Client;
 import com.simucredito.client.domain.model.Person;
 import com.simucredito.client.domain.repository.ClientRepository;
 import com.simucredito.client.domain.repository.PersonRepository;
+import com.simucredito.configuration.application.service.ConfigurationService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.security.core.Authentication;
@@ -24,6 +25,7 @@ public class ClientService {
     private final ClientRepository clientRepository;
     private final PersonRepository personRepository;
     private final ModelMapper modelMapper;
+    private final ConfigurationService configurationService;
 
     @Transactional
     public ClientDTO createClient(CreateClientRequestDTO request) {
@@ -144,13 +146,19 @@ public class ClientService {
         boolean isEligible = false;
 
         // Constantes
-        final BigDecimal TECHO_PROPIO_MAX_INCOME = new BigDecimal("3715");
+        BigDecimal techoPropioMaxIncome;
+        try {
+            techoPropioMaxIncome = configurationService.getNumericValue("BFH_MAX_MONTHLY_INCOME");
+        } catch (Exception e) {
+            // Fallback por seguridad si no encuentra el valor en BD
+            techoPropioMaxIncome = new BigDecimal("3715");
+        }
         final BigDecimal MIN_INCOME_FOR_CREDIT = new BigDecimal("1500"); // Umbral referencial del banco
 
         // --- 1. EVALUACIÓN TECHO PROPIO (Prioridad para ingresos bajos) ---
         boolean cumpleNoPropiedad = !request.getIsOwnerOfAnotherProperty();
         boolean cumpleNoApoyo = !request.getHasReceivedPreviousSupport();
-        boolean ingresosBajos = request.getFamilyNetIncome().compareTo(TECHO_PROPIO_MAX_INCOME) <= 0;
+        boolean ingresosBajos = request.getFamilyNetIncome().compareTo(techoPropioMaxIncome) <= 0;
 
         if (ingresosBajos) {
             if (cumpleNoPropiedad && cumpleNoApoyo) {
@@ -452,8 +460,12 @@ public class ClientService {
 
     private Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        // TODO: Extract user ID from JWT token or authentication principal
-        // For now, return a mock user ID
-        return 1L;
+
+        if (authentication != null && authentication.getPrincipal() instanceof com.simucredito.iam.domain.model.User) {
+            com.simucredito.iam.domain.model.User user = (com.simucredito.iam.domain.model.User) authentication.getPrincipal();
+            return user.getId();
+        }
+
+        throw new RuntimeException("Usuario no autenticado o sesión inválida");
     }
 }

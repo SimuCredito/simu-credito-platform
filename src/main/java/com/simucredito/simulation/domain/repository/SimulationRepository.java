@@ -32,4 +32,6 @@ public interface SimulationRepository extends JpaRepository<Simulation, Long> {
 
     @Query("SELECT SUM(s.totalInterest) FROM Simulation s WHERE s.status = 'COMPLETED' AND s.createdAt >= :startDate")
     Double getTotalPaymentsVolumeSince(@Param("startDate") LocalDateTime startDate);
+
+    long countByUserId(Long userId);
 }
