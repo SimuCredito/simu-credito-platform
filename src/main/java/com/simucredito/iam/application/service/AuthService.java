@@ -1,9 +1,6 @@
 package com.simucredito.iam.application.service;
 
-import com.simucredito.iam.application.dto.AuthResponseDTO;
-import com.simucredito.iam.application.dto.LoginRequestDTO;
-import com.simucredito.iam.application.dto.ProfileDTO;
-import com.simucredito.iam.application.dto.RegisterRequestDTO;
+import com.simucredito.iam.application.dto.*;
 import com.simucredito.iam.domain.model.User;
 import com.simucredito.iam.domain.repository.UserRepository;
 import com.simucredito.iam.infrastructure.security.JwtUtils;
@@ -99,6 +96,32 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
+        return modelMapper.map(user, ProfileDTO.class);
+    }
+
+    @Transactional
+    public ProfileDTO updateProfile(UpdateProfileRequestDTO request) {
+        // 1. Obtener el usuario autenticado del contexto de seguridad
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String email = authentication.getName();
+
+        // 2. Buscar el usuario en la base de datos
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        // 3. Actualizar los campos permitidos
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+        user.setPhoneNumber(request.getPhoneNumber());
+        user.setCompanyName(request.getCompanyName());
+        if (request.getPassword() != null && !request.getPassword().trim().isEmpty()) {
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+
+        // 4. Guardar cambios (el @Transactional se encarga del commit, pero save asegura el retorno)
+        user = userRepository.save(user);
+
+        // 5. Retornar el perfil actualizado mapeado a DTO
         return modelMapper.map(user, ProfileDTO.class);
     }
 }

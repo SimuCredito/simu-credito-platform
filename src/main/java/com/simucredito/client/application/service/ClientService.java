@@ -177,26 +177,24 @@ public class ClientService {
 
         // --- 2. EVALUACIÓN MIVIVIENDA / CRÉDITO HIPOTECARIO ---
         // Si gana más del límite de TP, o si gana menos pero quiere una casa más cara (evaluamos capacidad general)
-        if (!"ELIGIBLE".equals(techoPropioStatus)) {
-            if (request.getFamilyNetIncome().compareTo(MIN_INCOME_FOR_CREDIT) >= 0) {
-                isEligible = true; // Es sujeto de crédito
-                recomendacion.append("🏦 **Nuevo Crédito MiVivienda:**\n");
+        if (request.getFamilyNetIncome().compareTo(MIN_INCOME_FOR_CREDIT) >= 0) {
+            isEligible = true; // Es sujeto de crédito
+            recomendacion.append("🏦 **Nuevo Crédito MiVivienda:**\n");
 
-                if (cumpleNoPropiedad) {
-                    bbpStatus = "ELIGIBLE";
-                    recomendacion.append("   Calificas para un crédito hipotecario con el **Bono del Buen Pagador (BBP)**. ")
-                            .append("Este bono reducirá tu cuota inicial o el monto total a financiar. ")
-                            .append("Puedes buscar viviendas de mayor valor (hasta S/ 488,800 aprox).\n\n");
-                } else {
-                    recomendacion.append("   Cuentas con capacidad para un crédito hipotecario MiVivienda. ")
-                            .append("Sin embargo, al tener propiedad registrada, no aplicas al bono (BBP), ")
-                            .append("pero sí puedes beneficiarte de las tasas preferenciales del fondo.\n\n");
-                }
+            if (cumpleNoPropiedad) {
+                bbpStatus = "ELIGIBLE";
+                recomendacion.append("   Calificas para un crédito hipotecario con el **Bono del Buen Pagador (BBP)**. ")
+                        .append("Este bono reducirá tu cuota inicial o el monto total a financiar. ")
+                        .append("Puedes buscar viviendas de mayor valor (hasta S/ 488,800 aprox).\n\n");
             } else {
-                recomendacion.append("📉 **Análisis Financiero:**\n")
-                        .append("   Tus ingresos reportados podrían ser insuficientes para calificar a un crédito hipotecario bancario en este momento. ")
-                        .append("Te sugerimos sumar ingresos con un cónyuge o aval para mejorar tu perfil.\n\n");
+                recomendacion.append("   Cuentas con capacidad para un crédito hipotecario MiVivienda. ")
+                        .append("Sin embargo, al tener propiedad registrada, no aplicas al bono (BBP), ")
+                        .append("pero sí puedes beneficiarte de las tasas preferenciales del fondo.\n\n");
             }
+        } else {
+            recomendacion.append("📉 **Análisis Financiero:**\n")
+                    .append("   Tus ingresos reportados podrían ser insuficientes para calificar a un crédito hipotecario bancario en este momento. ")
+                    .append("Te sugerimos sumar ingresos con un cónyuge o aval para mejorar tu perfil.\n\n");
         }
 
         // --- 3. BONOS ADICIONALES (Acumulables) ---
@@ -373,7 +371,7 @@ public class ClientService {
     private void performInitialPreQualification(Client client, Person holder, Person spouse) {
         // Calculate age from birth date
         int age = holder.getBirthDate() != null ?
-            java.time.LocalDate.now().getYear() - holder.getBirthDate().getYear() : 0;
+                java.time.LocalDate.now().getYear() - holder.getBirthDate().getYear() : 0;
 
         // Calculate family net income
         BigDecimal familyNetIncome = holder.getMonthlyNetIncome() != null ? holder.getMonthlyNetIncome() : BigDecimal.ZERO;
@@ -407,7 +405,7 @@ public class ClientService {
     private void updateClientPreQualification(Client client, Person holder, Person spouse) {
         // Calculate age from birth date
         int age = holder.getBirthDate() != null ?
-            java.time.LocalDate.now().getYear() - holder.getBirthDate().getYear() : 0;
+                java.time.LocalDate.now().getYear() - holder.getBirthDate().getYear() : 0;
 
         // Calculate family net income
         BigDecimal familyNetIncome = holder.getMonthlyNetIncome() != null ? holder.getMonthlyNetIncome() : BigDecimal.ZERO;
