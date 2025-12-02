@@ -34,4 +34,11 @@ public interface SimulationRepository extends JpaRepository<Simulation, Long> {
     Double getTotalPaymentsVolumeSince(@Param("startDate") LocalDateTime startDate);
 
     long countByUserId(Long userId);
+
+    @Query(value = "SELECT cast(s.created_at as date) as date, COUNT(*) as count " +
+            "FROM simulations s " +
+            "WHERE s.user_id = :userId AND s.created_at >= :startDate " +
+            "GROUP BY cast(s.created_at as date) " +
+            "ORDER BY date ASC", nativeQuery = true)
+    List<Object[]> getDailySimulationStats(@Param("userId") Long userId, @Param("startDate") LocalDateTime startDate);
 }
