@@ -6,6 +6,7 @@ import com.simucredito.client.domain.repository.ClientRepository;
 import com.simucredito.client.domain.repository.PersonRepository;
 import com.simucredito.dashboard.application.dto.DashboardMetricsDTO;
 import com.simucredito.dashboard.application.dto.RecentActivityDTO;
+import com.simucredito.dashboard.application.dto.SimulationActivityDTO;
 import com.simucredito.iam.domain.model.User;
 import com.simucredito.iam.domain.repository.UserRepository;
 import com.simucredito.property.domain.model.Property;
@@ -20,7 +21,10 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -168,5 +172,46 @@ public class DashboardService {
                 .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
                 .limit(limit)
                 .collect(Collectors.toList());
+    }
+
+    public List<SimulationActivityDTO> getSimulationActivity(String period) {
+        Long userId = getCurrentUserId();
+        LocalDate endDate = LocalDate.now();
+        LocalDate startDate;
+
+        // Determinar rango de fechas
+        if ("month".equalsIgnoreCase(period)) {
+            // Desde el día 1 del mes actual
+            startDate = endDate.withDayOfMonth(1);
+        } else {
+            // Por defecto: Últimos 7 días (incluyendo hoy)
+            startDate = endDate.minusDays(6);
+        }
+
+        // Obtener datos crudos de la BD
+        List<Object[]> rawData = simulationRepository.getDailySimulationStats(userId, startDate.atStartOfDay());
+
+        // Convertir a Mapa para acceso rápido
+        Map<LocalDate, Long> statsMap = new TreeMap<>(); // TreeMap mantiene orden por fecha
+        for (Object[] row : rawData) {
+            // En PostgreSQL native query, la fecha viene como java.sql.Date
+            LocalDate date = ((java.sql.Date) row[0]).toLocalDate();
+            Long count = ((Number) row[1]).longValue();
+            statsMap.put(date, count);
+        }
+
+        // Rellenar huecos (días con 0 simulaciones)
+        List<SimulationActivityDTO> activityList = new ArrayList<>();
+        LocalDate current = startDate;
+
+        while (!current.isAfter(endDate)) {
+            activityList.add(SimulationActivityDTO.builder()
+                    .date(current)
+                    .count(statsMap.getOrDefault(current, 0L))
+                    .build());
+            current = current.plusDays(1);
+        }
+
+        return activityList;
     }
 }

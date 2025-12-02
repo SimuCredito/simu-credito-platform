@@ -48,4 +48,15 @@ public class DashboardController {
         List<RecentActivityDTO> activities = dashboardService.getRecentActivity(limit);
         return ResponseEntity.ok(activities);
     }
+    @GetMapping("/activity")
+    @Operation(summary = "Get simulation activity", description = "Retrieve simulation counts grouped by day for charts")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Activity data retrieved successfully",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = RecentActivityDTO.class)))
+    })
+    public ResponseEntity<List<com.simucredito.dashboard.application.dto.SimulationActivityDTO>> getSimulationActivity(
+            @RequestParam(defaultValue = "week") String period) {
+        return ResponseEntity.ok(dashboardService.getSimulationActivity(period));
+    }
 }
