@@ -1,9 +1,6 @@
 package com.simucredito.iam.presentation.controller;
 
-import com.simucredito.iam.application.dto.AuthResponseDTO;
-import com.simucredito.iam.application.dto.LoginRequestDTO;
-import com.simucredito.iam.application.dto.ProfileDTO;
-import com.simucredito.iam.application.dto.RegisterRequestDTO;
+import com.simucredito.iam.application.dto.*;
 import com.simucredito.iam.application.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -95,5 +92,23 @@ public class AuthController {
     public ResponseEntity<ProfileDTO> getProfileByEmail(@PathVariable String email) {
         ProfileDTO profile = authService.getProfileByEmail(email);
         return ResponseEntity.ok(profile);
+    }
+
+    @PutMapping("/profile")
+    @Operation(summary = "Update user profile", description = "Update the profile information of the currently authenticated user")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Profile updated successfully",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ProfileDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid input data",
+                    content = @Content),
+            @ApiResponse(responseCode = "404", description = "User not found",
+                    content = @Content),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content)
+    })
+    public ResponseEntity<ProfileDTO> updateProfile(@Valid @RequestBody UpdateProfileRequestDTO updateRequest) {
+        ProfileDTO updatedProfile = authService.updateProfile(updateRequest);
+        return ResponseEntity.ok(updatedProfile);
     }
 }
