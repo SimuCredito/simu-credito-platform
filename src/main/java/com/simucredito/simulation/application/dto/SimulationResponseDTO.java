@@ -121,6 +121,7 @@ public class SimulationResponseDTO {
     @AllArgsConstructor
     public static class InputParameters {
         private String currency;
+        private BigDecimal usdValue;
         private Integer termYears;
         private BigDecimal interestRate;
         private String interestRateType;

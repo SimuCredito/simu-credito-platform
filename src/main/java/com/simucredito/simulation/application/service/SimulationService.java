@@ -483,6 +483,7 @@ public class SimulationService {
 
         SimulationResponseDTO.InputParameters inputs = SimulationResponseDTO.InputParameters.builder()
                 .currency(simulation.getCurrency())
+                .usdValue(simulation.getUsdValue())
                 .termYears(simulation.getTermYears())
                 .interestRate(simulation.getInterestRate())
                 .interestRateType(simulation.getInterestRateType())
